@@ -6,9 +6,12 @@ import Footer from './components/layout/Footer';
 
 import ProtectedRoute from './components/common/ProtectedRoute'; 
 import AdminRoute from './components/auth/AdminRoute';
+import ArtistRoute from './components/auth/ArtistRoute';
 
 import Home from './pages/Home';
 import Login from './pages/Auth/Login';
+import AdminLogin from './pages/Auth/AdminLogin';
+import AdminRegister from './pages/Auth/AdminRegister';
 import Register from './pages/Auth/Register';
 
 import Profile from './pages/Artist/Profile';
@@ -29,14 +32,16 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin/register" element={<AdminRegister />} />
               <Route path="/register" element={<Register />} />
 
               <Route 
                 path="/dashboard" 
                 element={
-                  <ProtectedRoute>
+                  <ArtistRoute>
                     <ArtistDashboard />  
-                  </ProtectedRoute>
+                  </ArtistRoute>
                 } 
               />
 
@@ -52,9 +57,9 @@ function App() {
               <Route 
                 path="/upload" 
                 element={
-                  <ProtectedRoute>
+                  <ArtistRoute>
                     <UploadArt />
-                  </ProtectedRoute>
+                  </ArtistRoute>
                 } 
               />
 

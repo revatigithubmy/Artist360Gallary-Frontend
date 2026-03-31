@@ -1,10 +1,9 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-const AdminRoute = ({ children }) => {
+const ArtistRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
-  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -13,14 +12,12 @@ const AdminRoute = ({ children }) => {
     );
   }
 
-  
-  if (!user || user.role !== 'ADMIN') {
-    console.warn("Access denied: User is not an admin");
-    return <Navigate to="/admin/login" replace />;
+  if (!user || user.role !== 'ARTIST') {
+    console.warn("Access denied: User is not an artist");
+    return <Navigate to="/" replace />;
   }
-
 
   return children;
 };
 
-export default AdminRoute;
+export default ArtistRoute;

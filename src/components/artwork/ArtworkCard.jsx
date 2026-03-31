@@ -1,33 +1,73 @@
 import { useState } from 'react';
-import { Heart, MessageCircle, Tag } from 'lucide-react';
+import { Heart, MessageCircle, Tag, Users } from 'lucide-react';
 import interactionService from '../../services/interactionService';
 import CommentSection from './CommentSection';
+import ArtworkModal from './ArtworkModal';
 
-const ArtworkCard = ({ artwork }) => {
-  const [likes, setLikes] = useState(artwork.likesCount || 0);
+const ArtworkCard = ({ artwork, onLikeChange }) => {
+  const [likes, setLikes] = useState(artwork?.likesCount || 0);
   const [isLiked, setIsLiked] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [liking, setLiking] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [followers, setFollowers] = useState(artwork?.artist?.followersCount || 0);
+  const [isFollowing, setIsFollowing] = useState(false);
 
-  if (!artwork) return null;
+  if (!artwork || !artwork.imageUrl) return null;
 
   const handleLike = async (e) => {
-  e.stopPropagation();
-  try {
-    await interactionService.likeArtwork(artwork.id);
-    setLikes(prev => isLiked ? prev - 1 : prev + 1);
-    setIsLiked(!isLiked);
-  } catch (err) {
-    if (err.response?.status === 401 || err.response?.status === 403) {
-      alert("Session expired. Please login again.");
-    } else {
-      console.error("Backend Error:", err.response?.data);
-      alert("Server error: Check if LikeService is working.");
+    e.stopPropagation();
+    if (liking) return;
+    
+    try {
+      setLiking(true);
+      const response = await interactionService.likeArtwork(artwork.id);
+      
+      if (response.isLiked) {
+        setLikes(prev => prev + 1);
+        setIsLiked(true);
+      } else {
+        setLikes(prev => Math.max(0, prev - 1));
+        setIsLiked(false);
+      }
+      
+      if (onLikeChange) {
+        onLikeChange(artwork.id, response.isLiked, response.isLiked ? likes + 1 : likes - 1);
+      }
+    } catch (err) {
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        alert("Session expired. Please login again.");
+      } else {
+        console.error("Backend Error:", err.response?.data);
+        alert("Failed to like artwork. Please try again.");
+      }
+    } finally {
+      setLiking(false);
     }
-  }
-};
+  };
+
+  const handleFollowToggle = async (e) => {
+    e.stopPropagation();
+    try {
+      if (isFollowing) {
+        await interactionService.unfollowArtist(artwork.artist?.id);
+        setFollowers(prev => Math.max(0, prev - 1));
+        setIsFollowing(false);
+      } else {
+        await interactionService.followArtist(artwork.artist?.id);
+        setFollowers(prev => prev + 1);
+        setIsFollowing(true);
+      }
+    } catch (err) {
+      console.error("Follow error:", err);
+      alert("Failed to update follow status");
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="bg-[#1E293B]/50 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 hover:border-violet-500/50 transition-all duration-300 shadow-lg group">
+      <div className="bg-[#1E293B]/50 backdrop-blur-sm rounded-xl overflow-hidden border border-white/10 hover:border-violet-500/50 transition-all duration-300 shadow-lg group cursor-pointer"
+           onClick={() => setShowModal(true)}>
         
         <div className="relative aspect-[4/5] overflow-hidden">
           <img 
@@ -60,9 +100,14 @@ const ArtworkCard = ({ artwork }) => {
             </span>
           </div>
           
-          <p className="text-gray-400 text-sm mb-3">
-            by <span className="text-violet-400">@{artwork.artist?.name || 'Artist'}</span>
-          </p>
+          <div className="flex justify-between items-center mb-3">
+            <p className="text-gray-400 text-sm">
+              by <span className="text-violet-400">@{artwork.artist?.name || 'Artist'}</span>
+            </p>
+            <span className="flex items-center gap-1 text-gray-400 text-sm">
+              <Users size={14} className="text-blue-400" /> {followers}
+            </span>
+          </div>
           
           {artwork.tags && (
             <div className="flex flex-wrap gap-2">
@@ -81,6 +126,17 @@ const ArtworkCard = ({ artwork }) => {
           <CommentSection artworkId={artwork.id} />
         </div>
       )}
+
+      <ArtworkModal 
+        artwork={artwork} 
+        isOpen={showModal} 
+        onClose={() => setShowModal(false)}
+        onLike={() => handleLike({ stopPropagation: () => {} })}
+        isLiked={isLiked}
+        onFollowToggle={handleFollowToggle}
+        isFollowing={isFollowing}
+        followers={followers}
+      />
     </div>
   );
 };

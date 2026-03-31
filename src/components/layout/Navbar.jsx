@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import NotificationBell from './NotificationBell';
 import { 
   Menu, X, User, LogOut, PlusSquare, 
   Palette, LayoutDashboard, ShieldCheck, Settings 
@@ -12,6 +13,7 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const isAdmin = user && user.role === 'ADMIN';
+  const isArtist = user && user.role === 'ARTIST';
 
   const handleLogout = () => {
     logout();
@@ -38,6 +40,8 @@ const Navbar = () => {
           
           {user ? (
             <>
+              {/* Notification Bell */}
+              <NotificationBell />
          
               {isAdmin && (
                 <Link 
@@ -48,13 +52,17 @@ const Navbar = () => {
                 </Link>
               )}
 
-              <Link to="/dashboard" className="text-sm font-medium text-slate-300 hover:text-white flex items-center gap-1">
-                <LayoutDashboard size={16} /> Dashboard
-              </Link>
-              
-              <Link to="/upload" className="text-sm font-medium text-slate-300 hover:text-white flex items-center gap-1">
-                <PlusSquare size={16} /> Upload
-              </Link>
+              {isArtist && (
+                <>
+                  <Link to="/dashboard" className="text-sm font-medium text-slate-300 hover:text-white flex items-center gap-1">
+                    <LayoutDashboard size={16} /> Dashboard
+                  </Link>
+                  
+                  <Link to="/upload" className="text-sm font-medium text-slate-300 hover:text-white flex items-center gap-1">
+                    <PlusSquare size={16} /> Upload
+                  </Link>
+                </>
+              )}
               
               <Link to="/profile" className="text-sm font-medium text-slate-300 hover:text-white flex items-center gap-1">
                 <User size={16} /> Profile
@@ -89,7 +97,12 @@ const Navbar = () => {
                🛡️ Admin Panel
             </Link>
           )}
-          <Link to="/dashboard" onClick={() => setIsOpen(false)} className="block py-2 text-slate-300">Dashboard</Link>
+          {isArtist && (
+            <>
+              <Link to="/dashboard" onClick={() => setIsOpen(false)} className="block py-2 text-slate-300">Dashboard</Link>
+              <Link to="/upload" onClick={() => setIsOpen(false)} className="block py-2 text-slate-300">Upload Art</Link>
+            </>
+          )}
           <Link to="/profile" onClick={() => setIsOpen(false)} className="block py-2 text-slate-300">Profile</Link>
           <button onClick={handleLogout} className="w-full text-left py-2 text-red-400 font-bold">Logout</button>
         </div>

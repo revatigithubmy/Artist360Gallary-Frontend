@@ -1,97 +1,292 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Upload, AlertCircle, CheckCircle, Loader2, X, Image as ImageIcon } from 'lucide-react';
 import api from '../../services/api';
-import { Upload, Image as ImageIcon, Tag, Type, Loader2, CheckCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const UploadArt = () => {
-  const [file, setFile] = useState(null);
-  const [details, setDetails] = useState({ title: '', description: '', tags: '' });
-  const [preview, setPreview] = useState(null);
-  const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const fileInputRef = useRef(null);
+
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    tags: ''
+  });
+
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
 
   const handleFileChange = (e) => {
-    const selected = e.target.files[0];
-    setFile(selected);
-    setPreview(URL.createObjectURL(selected));
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    // Validate file is an image
+    if (!selectedFile.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setError('File size must be less than 10MB');
+      return;
+    }
+
+    setFile(selectedFile);
+    setError(null);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreview(reader.result);
+    };
+    reader.readAsDataURL(selectedFile);
   };
 
-  const handleUpload = async (e) => {
-    e.preventDefault();
-    setUploading(true);
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('title', details.title);
-    formData.append('description', details.description);
-    formData.append('tags', details.tags);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!file) {
+      setError('Please select an image to upload');
+      return;
+    }
+
+    if (!formData.title.trim()) {
+      setError('Please enter a title');
+      return;
+    }
+
+    if (!formData.description.trim()) {
+      setError('Please enter a description');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
 
     try {
-      await api.post('/artworks/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+      uploadFormData.append('title', formData.title.trim());
+      uploadFormData.append('description', formData.description.trim());
+      uploadFormData.append('tags', formData.tags.trim());
+
+      await api.post('/artworks/upload', uploadFormData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
-      navigate('/');
+
+      setSuccess(true);
+      setFormData({ title: '', description: '', tags: '' });
+      setFile(null);
+      setPreview(null);
+
+      // Redirect to dashboard after 2 seconds
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 2000);
     } catch (err) {
-      alert("Upload failed. Check your Cloudinary backend config.");
+      console.error('Upload error:', err);
+      setError(err.response?.data?.message || 'Failed to upload artwork. Please try again.');
     } finally {
-      setUploading(false);
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setFile(null);
+    setPreview(null);
+    setFormData({ title: '', description: '', tags: '' });
+    setError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-10">
-      <h2 className="text-3xl font-bold mb-8 text-gradient">Upload Your Masterpiece</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+    <div className="max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-white flex items-center gap-3 mb-2">
+          <Upload className="text-violet-500" size={40} /> Upload Artwork
+        </h1>
+        <p className="text-slate-400">Share your creative masterpiece with the world</p>
+      </div>
+
+      {/* Success Message */}
+      {success && (
+        <div className="mb-6 p-4 bg-green-900/30 border border-green-500/50 rounded-lg flex items-center gap-3">
+          <CheckCircle className="text-green-500" size={20} />
+          <div>
+            <p className="text-green-400 font-bold">Upload successful!</p>
+            <p className="text-green-300 text-sm">Redirecting to dashboard...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-lg flex items-center gap-3">
+          <AlertCircle className="text-red-500" size={20} />
+          <p className="text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* Upload Form */}
+      <form onSubmit={handleSubmit} className="bg-slate-900/50 border border-white/10 rounded-2xl p-8 space-y-6">
         
-        <div className="flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-2xl bg-[#1E293B]/30 p-6 min-h-[400px]">
+        {/* File Upload Area */}
+        <div>
+          <label className="block text-sm font-bold text-white mb-3">Image File *</label>
+          
           {preview ? (
-            <img src={preview} alt="Preview" className="max-h-[350px] rounded-lg shadow-xl" />
+            // Preview Mode
+            <div className="relative group">
+              <img 
+                src={preview} 
+                alt="Preview" 
+                className="w-full max-h-96 object-cover rounded-lg border border-white/10"
+              />
+              <div className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-violet-600 hover:bg-violet-700 px-4 py-2 rounded-lg font-semibold transition-colors"
+                >
+                  Change Image
+                </button>
+              </div>
+            </div>
           ) : (
-            <div className="text-center text-gray-500">
-              <ImageIcon size={64} className="mx-auto mb-4 opacity-20" />
-              <p>Select an image to see preview</p>
+            // Upload Placeholder
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-white/20 hover:border-violet-500 rounded-lg p-8 text-center cursor-pointer transition-colors"
+            >
+              <ImageIcon className="mx-auto text-slate-400 mb-3" size={48} />
+              <p className="text-white font-semibold mb-1">Click to select image</p>
+              <p className="text-slate-400 text-sm">or drag and drop</p>
+              <p className="text-slate-500 text-xs mt-2">Supported: JPG, PNG, GIF, WEBP (Max 10MB)</p>
             </div>
           )}
-          <input type="file" id="artInput" hidden onChange={handleFileChange} accept="image/*" />
-          <label htmlFor="artInput" className="mt-6 cursor-pointer bg-white/5 hover:bg-white/10 px-6 py-2 rounded-full transition-all flex items-center gap-2">
-            <Upload size={18} /> Choose File
-          </label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+            disabled={loading}
+          />
         </div>
-        <form onSubmit={handleUpload} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm text-gray-400 flex items-center gap-2"><Type size={16}/> Title</label>
-            <input 
-              type="text" required
-              className="w-full bg-[#0F172A] border border-white/10 rounded-lg p-3 text-white focus:border-violet-500 outline-none"
-              onChange={(e) => setDetails({...details, title: e.target.value})}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm text-gray-400">Description</label>
-            <textarea 
-              rows="4" required
-              className="w-full bg-[#0F172A] border border-white/10 rounded-lg p-3 text-white focus:border-violet-500 outline-none"
-              onChange={(e) => setDetails({...details, description: e.target.value})}
-            ></textarea>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm text-gray-400 flex items-center gap-2"><Tag size={16}/> Tags (comma separated)</label>
-            <input 
-              type="text" placeholder="digital, oil, abstract"
-              className="w-full bg-[#0F172A] border border-white/10 rounded-lg p-3 text-white focus:border-violet-500 outline-none"
-              onChange={(e) => setDetails({...details, tags: e.target.value})}
-            />
-          </div>
 
-          <button 
-            disabled={uploading || !file}
-            className="w-full bg-violet-600 hover:bg-violet-500 disabled:bg-gray-700 py-4 rounded-xl font-bold text-lg flex justify-center items-center gap-2 transition-all shadow-lg shadow-violet-500/20"
+        {/* Title */}
+        <div>
+          <label htmlFor="title" className="block text-sm font-bold text-white mb-2">
+            Artwork Title *
+          </label>
+          <input
+            id="title"
+            name="title"
+            type="text"
+            value={formData.title}
+            onChange={handleInputChange}
+            placeholder="e.g., Sunset over the Mountains"
+            maxLength={200}
+            disabled={loading}
+            className="w-full bg-slate-800 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          />
+          <p className="text-slate-400 text-xs mt-1">{formData.title.length}/200 characters</p>
+        </div>
+
+        {/* Description */}
+        <div>
+          <label htmlFor="description" className="block text-sm font-bold text-white mb-2">
+            Description *
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            value={formData.description}
+            onChange={handleInputChange}
+            placeholder="Tell the story behind your artwork..."
+            rows={5}
+            maxLength={1000}
+            disabled={loading}
+            className="w-full bg-slate-800 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 disabled:opacity-50 disabled:cursor-not-allowed resize-none transition-colors"
+          />
+          <p className="text-slate-400 text-xs mt-1">{formData.description.length}/1000 characters</p>
+        </div>
+
+        {/* Tags */}
+        <div>
+          <label htmlFor="tags" className="block text-sm font-bold text-white mb-2">
+            Tags (comma-separated)
+          </label>
+          <input
+            id="tags"
+            name="tags"
+            type="text"
+            value={formData.tags}
+            onChange={handleInputChange}
+            placeholder="e.g., landscape, nature, sunset"
+            maxLength={200}
+            disabled={loading}
+            className="w-full bg-slate-800 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          />
+          <p className="text-slate-400 text-xs mt-1">Helps others discover your work</p>
+        </div>
+
+        {/* Form Actions */}
+        <div className="flex gap-3 pt-4">
+          <button
+            type="submit"
+            disabled={loading || !file}
+            className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
-            {uploading ? <Loader2 className="animate-spin" /> : <CheckCircle size={22} />}
-            {uploading ? 'Processing with Cloudinary...' : 'Publish Artwork'}
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin" size={20} />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload size={20} />
+                Upload Artwork
+              </>
+            )}
           </button>
-        </form>
+
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={loading}
+            className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            <X size={20} />
+            Cancel
+          </button>
+        </div>
+      </form>
+
+      {/* Info Box */}
+      <div className="mt-8 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+        <p className="text-blue-300 text-sm">
+          💡 <strong>Tip:</strong> Use clear titles and detailed descriptions to increase visibility. Add relevant tags to help artists and collectors discover your work!
+        </p>
       </div>
     </div>
   );
